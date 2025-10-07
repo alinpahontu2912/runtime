@@ -85,23 +85,25 @@ namespace System.IO.Compression
                 BufferSize = ZipFile.FileStreamBufferSize
             };
 
-            // Restore Unix permissions, only from entries that were created on Unix systems.
-            // For security, limit to ownership permissions, and respect umask (through UnixCreateMode).
-            // We don't apply UnixFileMode.None because .zip files created on Windows and .zip files created
-            // with previous versions of .NET don't include permissions.
-            if (!OperatingSystem.IsWindows() && source.CreatedOnUnix)
-            {
-                const UnixFileMode OwnershipPermissions =
-                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-                    UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
-                    UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
+            const UnixFileMode OwnershipPermissions =
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
 
-                UnixFileMode mode = (UnixFileMode)(source.ExternalAttributes >> 16) & OwnershipPermissions;
-                if (mode != UnixFileMode.None)
+            if (source.CreatedOnUnix)
+            {
+                if (!OperatingSystem.IsWindows())
                 {
-                    fileStreamOptions.UnixCreateMode = mode;
+                    UnixFileMode mode = (UnixFileMode)(source.ExternalAttributes >> 16) & OwnershipPermissions;
+
+                    if (mode != UnixFileMode.None)
+                    {
+                        fileStreamOptions.UnixCreateMode = mode;
+                    }
+
                 }
             }
+
         }
 
         private static void ExtractToFileFinalize(ZipArchiveEntry source, string destinationFileName) =>
