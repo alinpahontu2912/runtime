@@ -89,17 +89,13 @@ namespace System.IO.Compression
                 UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
                 UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
 
+            UnixFileMode mode = (UnixFileMode)(source.ExternalAttributes >> 16) & OwnershipPermissions;
+
             if (!OperatingSystem.IsWindows())
             {
-                UnixFileMode fullMode = (UnixFileMode)(source.ExternalAttributes >> 16);
-
-                // Detect any non-rwx bits (Windows-only flags like archive, hidden, system)
-                bool nonUnixFlags = (fullMode & ~OwnershipPermissions) != 0;
-                UnixFileMode mode = fullMode & OwnershipPermissions;
-
-                // For Windows-created ZIP or missing Unix permissions, apply safe Linux defaults
-                if (nonUnixFlags || mode == UnixFileMode.None)
+                if (mode == UnixFileMode.None)
                 {
+                    // Apply safe defaults for Windows-created ZIPs
                     mode = UnixFileMode.UserRead | UnixFileMode.UserWrite |
                            UnixFileMode.GroupRead |
                            UnixFileMode.OtherRead;
