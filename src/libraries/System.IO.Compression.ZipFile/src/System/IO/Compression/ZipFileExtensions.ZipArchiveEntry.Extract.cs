@@ -77,6 +77,7 @@ namespace System.IO.Compression
         {
             ArgumentNullException.ThrowIfNull(source);
             ArgumentNullException.ThrowIfNull(destinationFileName);
+
             fileStreamOptions = new()
             {
                 Access = FileAccess.Write,
@@ -90,20 +91,22 @@ namespace System.IO.Compression
                 UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
                 UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
 
-            if (source.CreatedOnUnix)
+            // Restore Unix permissions.
+            // For security, limit to ownership permissions, and respect umask (through UnixCreateMode).
+            // We don't apply UnixFileMode.None because .zip files created on Windows and .zip files created
+            // with previous versions of .NET don't include permissions.
+            UnixFileMode mode = (UnixFileMode)(source.ExternalAttributes >> 16) & OwnershipPermissions;
+            if (!OperatingSystem.IsWindows())
             {
-                if (!OperatingSystem.IsWindows())
+                if (source.CreatedOnUnix)
                 {
-                    UnixFileMode mode = (UnixFileMode)(source.ExternalAttributes >> 16) & OwnershipPermissions;
-
-                    if (mode != UnixFileMode.None)
-                    {
-                        fileStreamOptions.UnixCreateMode = mode;
-                    }
-
+                    fileStreamOptions.UnixCreateMode = mode;
+                }
+                else
+                {
+                    fileStreamOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
                 }
             }
-
         }
 
         private static void ExtractToFileFinalize(ZipArchiveEntry source, string destinationFileName) =>
