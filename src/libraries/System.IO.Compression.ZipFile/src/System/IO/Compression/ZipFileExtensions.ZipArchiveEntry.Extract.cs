@@ -84,23 +84,23 @@ namespace System.IO.Compression
                 Share = FileShare.None,
                 BufferSize = ZipFile.FileStreamBufferSize
             };
-            const UnixFileMode OwnershipPermissions =
-                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-                UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
-                UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
 
-            UnixFileMode mode = (UnixFileMode)(source.ExternalAttributes >> 16) & OwnershipPermissions;
-
-            if (!OperatingSystem.IsWindows())
+            // Restore Unix permissions, only from entries that were created on Unix systems.
+            // For security, limit to ownership permissions, and respect umask (through UnixCreateMode).
+            // We don't apply UnixFileMode.None because .zip files created on Windows and .zip files created
+            // with previous versions of .NET don't include permissions.
+            if (!OperatingSystem.IsWindows() && source.CreatedOnUnix)
             {
-                if (mode == UnixFileMode.None)
+                const UnixFileMode OwnershipPermissions =
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                    UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
+                    UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
+
+                UnixFileMode mode = (UnixFileMode)(source.ExternalAttributes >> 16) & OwnershipPermissions;
+                if (mode != UnixFileMode.None)
                 {
-                    // Apply safe defaults for Windows-created ZIPs
-                    mode = UnixFileMode.UserRead | UnixFileMode.UserWrite |
-                           UnixFileMode.GroupRead |
-                           UnixFileMode.OtherRead;
+                    fileStreamOptions.UnixCreateMode = mode;
                 }
-                fileStreamOptions.UnixCreateMode = mode;
             }
         }
 
