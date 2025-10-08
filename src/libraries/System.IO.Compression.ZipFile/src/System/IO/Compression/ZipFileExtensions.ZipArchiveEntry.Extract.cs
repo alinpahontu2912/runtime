@@ -95,10 +95,10 @@ namespace System.IO.Compression
             // For security, limit to ownership permissions, and respect umask (through UnixCreateMode).
             // We don't apply UnixFileMode.None because .zip files created on Windows and .zip files created
             // with previous versions of .NET don't include permissions.
-            UnixFileMode mode = (UnixFileMode)(source.ExternalAttributes >> 16) & OwnershipPermissions;
-            if (mode != UnixFileMode.None && !OperatingSystem.IsWindows() && source.CreatedOnUnix)
+            //UnixFileMode mode = (UnixFileMode)(source.ExternalAttributes >> 16) & OwnershipPermissions;
+            if (!OperatingSystem.IsWindows() && source.CreatedOnUnix)
             {
-                fileStreamOptions.UnixCreateMode = mode;
+                fileStreamOptions.UnixCreateMode = OwnershipPermissions;
             }
         }
 
