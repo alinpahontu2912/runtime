@@ -1,6 +1,8 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.IO.Enumeration;
+
 namespace System.IO.Compression
 {
     public static partial class ZipFileExtensions
@@ -95,10 +97,16 @@ namespace System.IO.Compression
             // For security, limit to ownership permissions, and respect umask (through UnixCreateMode).
             // We don't apply UnixFileMode.None because .zip files created on Windows and .zip files created
             // with previous versions of .NET don't include permissions.
-            //UnixFileMode mode = (UnixFileMode)(source.ExternalAttributes >> 16) & OwnershipPermissions;
-            if (!OperatingSystem.IsWindows() && source.CreatedOnUnix)
+            UnixFileMode mode = (UnixFileMode)(source.ExternalAttributes >> 16) & OwnershipPermissions;
+            if (!OperatingSystem.IsWindows())
             {
-                fileStreamOptions.UnixCreateMode = OwnershipPermissions;
+                if (source.CreatedOnUnix)
+                {
+                    fileStreamOptions.UnixCreateMode = mode;
+                }
+                else {
+                    fileStreamOptions.UnixCreateMode = OwnershipPermissions;
+                }
             }
         }
 
