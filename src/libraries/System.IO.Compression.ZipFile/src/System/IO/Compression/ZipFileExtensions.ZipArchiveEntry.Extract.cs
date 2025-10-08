@@ -96,16 +96,9 @@ namespace System.IO.Compression
             // We don't apply UnixFileMode.None because .zip files created on Windows and .zip files created
             // with previous versions of .NET don't include permissions.
             UnixFileMode mode = (UnixFileMode)(source.ExternalAttributes >> 16) & OwnershipPermissions;
-            if (!OperatingSystem.IsWindows())
+            if (mode != UnixFileMode.None && !OperatingSystem.IsWindows() && source.CreatedOnUnix)
             {
-                if (source.CreatedOnUnix)
-                {
-                    fileStreamOptions.UnixCreateMode = mode;
-                }
-                else
-                {
-                    fileStreamOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
-                }
+                fileStreamOptions.UnixCreateMode = mode;
             }
         }
 
