@@ -51,7 +51,7 @@ namespace System.IO.Compression.Tests
 
         [Theory]
         [InlineData("file1.txt", "file2.txt", "file3.txt")]
-        public void CreatedOnUnixFlagTest(params string[] entryNames)
+        public void VersionMadeByFlagTest(params string[] entryNames)
         {
             bool expectedCreatedOnUnix = !PlatformDetection.IsWindows;
 
@@ -71,7 +71,7 @@ namespace System.IO.Compression.Tests
 
             foreach (var entry in readArchive.Entries)
             {
-                Assert.Equal(expectedCreatedOnUnix, entry.CreatedOnUnix);
+                Assert.Equal(expectedCreatedOnUnix, entry.VersionMadeByPlatform == ZipVersionMadeByPlatform.Unix);
             }
         }
 

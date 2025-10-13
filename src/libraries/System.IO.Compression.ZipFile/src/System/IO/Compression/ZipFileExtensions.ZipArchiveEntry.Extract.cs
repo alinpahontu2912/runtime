@@ -92,7 +92,7 @@ namespace System.IO.Compression
             // For security, limit to ownership permissions, and respect umask
             // We don't apply UnixFileMode.None because .zip files created on Windows and .zip files created
             // with previous versions of .NET don't include permissions.
-            if (!OperatingSystem.IsWindows() && source.CreatedOnUnix)
+            if (!OperatingSystem.IsWindows() && source.VersionMadeByPlatform == ZipVersionMadeByPlatform.Unix)
             {
                 const UnixFileMode OwnershipPermissions =
                     UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |

@@ -311,7 +311,7 @@ namespace System.IO.Compression
         /// <summary>
         /// Checks if the entry was created on a Unix platform.
         /// </summary>
-        public bool CreatedOnUnix => _versionMadeByPlatform == ZipVersionMadeByPlatform.Unix;
+        public ZipVersionMadeByPlatform VersionMadeByPlatform => _versionMadeByPlatform;
 
         internal ZipArchive.ChangeState Changes { get; private set; }
 
