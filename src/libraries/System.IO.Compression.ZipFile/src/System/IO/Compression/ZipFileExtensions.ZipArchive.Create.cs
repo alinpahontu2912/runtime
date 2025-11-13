@@ -116,12 +116,9 @@ namespace System.IO.Compression
 
             FileStream fs = new FileStream(sourceFileName, FileMode.Open, FileAccess.Read, FileShare.Read, ZipFile.FileStreamBufferSize, useAsync);
 
-            ZipArchiveEntry entry = password is not null ? (compressionLevel.HasValue
-                            ? destination.CreateEntry(entryName, compressionLevel.Value, password, encryption)
-                            : destination.CreateEntry(entryName, password, encryption))
-                        : (compressionLevel.HasValue
+            ZipArchiveEntry entry = compressionLevel.HasValue
                             ? destination.CreateEntry(entryName, compressionLevel.Value)
-                            : destination.CreateEntry(entryName));
+                            : destination.CreateEntry(entryName);
 
             DateTime lastWrite = File.GetLastWriteTime(sourceFileName);
 

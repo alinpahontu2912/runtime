@@ -301,7 +301,7 @@ public partial class ZipArchiveEntry
         return zip64ExtraField != null;
     }
 
-    private async Task WriteLocalFileHeaderAndDataIfNeededAsync(bool forceWrite, CancellationToken cancellationToken)
+    private async Task WriteLocalFileHeaderAndDataIfNeededAsync(bool forceWrite, CancellationToken cancellationToken, string? password = null, EncryptionMethod encryption = EncryptionMethod.None)
     {
         cancellationToken.ThrowIfCancellationRequested();
         // _storedUncompressedData gets frozen here, and is what gets written to the file
@@ -313,7 +313,7 @@ public partial class ZipArchiveEntry
 
                 //The compressor fills in CRC and sizes
                 //The DirectToArchiveWriterStream writes headers and such
-                DirectToArchiveWriterStream entryWriter = new(GetDataCompressor(_archive.ArchiveStream, true, null), this);
+                DirectToArchiveWriterStream entryWriter = new(GetDataCompressor(_archive.ArchiveStream, true, null, password, encryption), this);
                 await using (entryWriter)
                 {
                     _storedUncompressedData.Seek(0, SeekOrigin.Begin);
