@@ -144,37 +144,38 @@ namespace System.IO.Compression
         Deflate = 8,
         Deflate64 = 9,
     }
-    public sealed partial class ZipStreamReader : System.IAsyncDisposable, System.IDisposable
+    public sealed partial class ZipInputStream : System.IO.Stream
     {
-        public ZipStreamReader(System.IO.Stream stream, bool leaveOpen = false) { }
-        public ZipStreamReader(System.IO.Stream stream, System.Text.Encoding? entryNameEncoding, bool tolerant = false, bool leaveOpen = false) { }
-        public System.IO.Compression.ZipStreamReaderEntry? CurrentEntry { get { throw null; } }
+        public ZipInputStream(System.IO.Stream stream, bool leaveOpen = false) { }
+        public ZipInputStream(System.IO.Stream stream, System.Text.Encoding? entryNameEncoding, bool leaveOpen = false) { }
+        public System.IO.Compression.ZipInputStreamEntry? CurrentEntry { get { throw null; } }
+        public override bool CanRead { get { throw null; } }
+        public override bool CanSeek { get { throw null; } }
+        public override bool CanWrite { get { throw null; } }
+        public override long Length { get { throw null; } }
+        public override long Position { get { throw null; } set { } }
         public bool MoveToNextEntry() { throw null; }
-        public System.Threading.Tasks.ValueTask<bool> MoveToNextEntryAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) { throw null; }
-        public System.IO.Stream OpenEntryStream() { throw null; }
-        public System.Threading.Tasks.ValueTask<System.IO.Stream> OpenEntryStreamAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) { throw null; }
-        public void Dispose() { }
-        public System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+        public override int Read(byte[] buffer, int offset, int count) { throw null; }
+        public override int Read(System.Span<byte> buffer) { throw null; }
+        public override int ReadByte() { throw null; }
+        public override void Flush() { }
+        public override long Seek(long offset, System.IO.SeekOrigin origin) { throw null; }
+        public override void SetLength(long value) { }
+        public override void Write(byte[] buffer, int offset, int count) { }
     }
-    public sealed partial class ZipStreamReaderEntry
+    public sealed partial class ZipInputStreamEntry
     {
-        internal ZipStreamReaderEntry() { }
+        internal ZipInputStreamEntry() { }
         public string FullName { get { throw null; } }
         public string Name { get { throw null; } }
         public System.IO.Compression.ZipCompressionMethod CompressionMethod { get { throw null; } }
         public System.DateTimeOffset LastModified { get { throw null; } }
-        [System.CLSCompliantAttribute(false)]
-        public uint Crc32 { get { throw null; } }
         public long CompressedLength { get { throw null; } }
         public long UncompressedLength { get { throw null; } }
-        [System.CLSCompliantAttribute(false)]
-        public ushort GeneralPurposeBitFlags { get { throw null; } }
         public bool IsEncrypted { get { throw null; } }
         public bool IsDirectory { get { throw null; } }
         [System.CLSCompliantAttribute(false)]
         public ushort VersionNeeded { get { throw null; } }
-        public bool ValidateEntry() { throw null; }
-        public bool ValidateEntry(out string? errorMessage) { throw null; }
     }
     public sealed partial class ZLibCompressionOptions
     {

@@ -99,7 +99,7 @@ internal sealed class BoundedReadStream : Stream
     {
         if (disposing && !_isDisposed)
         {
-            // Do not close the base stream — it is owned by the ZipStreamReader
+            // Do not close the base stream — it is owned by the ZipInputStream
             _isDisposed = true;
         }
         base.Dispose(disposing);

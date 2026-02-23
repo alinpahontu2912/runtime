@@ -308,25 +308,10 @@
   <data name="IO_SeekBeforeBegin" xml:space="preserve">
     <value>An attempt was made to move the position before the beginning of the stream.</value>
   </data>
-  <data name="ZipStreamReaderNoCurrentEntry" xml:space="preserve">
-    <value>No current entry. Call MoveToNextEntry first.</value>
-  </data>
-  <data name="ZipStreamReaderEntryStreamAlreadyOpen" xml:space="preserve">
-    <value>An entry stream is already open. Dispose it or call MoveToNextEntry before opening another.</value>
-  </data>
-  <data name="ZipStreamReaderEncryptedNotSupported" xml:space="preserve">
+  <data name="ZipInputStreamEncryptedNotSupported" xml:space="preserve">
     <value>Opening encrypted ZIP entries is not supported.</value>
   </data>
-  <data name="ZipStreamReaderEntryNotFullyRead" xml:space="preserve">
-    <value>The entry stream has not been fully read. Read all entry data or call MoveToNextEntry before validating.</value>
-  </data>
-  <data name="ZipStreamReaderCrc32Mismatch" xml:space="preserve">
-    <value>CRC-32 validation failed. Computed: 0x{0:X8}, expected: 0x{1:X8}.</value>
-  </data>
-  <data name="ZipStreamReaderSizeMismatch" xml:space="preserve">
-    <value>Uncompressed size mismatch. Read: {0}, expected: {1}.</value>
-  </data>
-  <data name="ZipStreamReaderDataDescriptorSignatureRequired" xml:space="preserve">
+  <data name="ZipInputStreamDataDescriptorSignatureRequired" xml:space="preserve">
     <value>Data descriptor signature is required for forward-only streaming but was not found.</value>
   </data>
 </root>
