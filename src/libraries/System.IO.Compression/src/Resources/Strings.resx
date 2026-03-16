@@ -308,4 +308,13 @@
   <data name="IO_SeekBeforeBegin" xml:space="preserve">
     <value>An attempt was made to move the position before the beginning of the stream.</value>
   </data>
+  <data name="ZipStreamReaderStoredDataDescriptorNotSupported" xml:space="preserve">
+    <value>Entries using Stored compression with data descriptors are not supported by the forward-only reader because the compressed size is unknown and the unframed data cannot be reliably delimited.</value>
+  </data>
+  <data name="ZipStreamReaderCannotExtractDirectory" xml:space="preserve">
+    <value>Cannot extract a directory entry to a file.</value>
+  </data>
+  <data name="ZipStreamReaderDataStreamInvalidated" xml:space="preserve">
+    <value>The entry's data stream has been invalidated because the reader advanced past this entry.</value>
+  </data>
 </root>

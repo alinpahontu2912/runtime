@@ -55,6 +55,10 @@
     <Compile Include="System\IO\Compression\ZLibCompressionOptions.cs" />
     <Compile Include="System\IO\Compression\ZLibStream.cs" />
     <Compile Include="System\IO\Compression\ZipCompressionMethod.cs" />
+    <Compile Include="System\IO\Compression\ZipStreamReader.cs" />
+    <Compile Include="System\IO\Compression\ZipStreamReaderEntry.cs" />
+    <Compile Include="System\IO\Compression\ZipBoundedReadStream.cs" />
+    <Compile Include="System\IO\Compression\ZipForwardOnlyDeflateStream.cs" />
     <Compile Include="$(CommonPath)System\Obsoletions.cs"
              Link="Common\System\Obsoletions.cs" />
   </ItemGroup>

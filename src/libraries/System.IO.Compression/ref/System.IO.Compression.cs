@@ -144,6 +144,36 @@ namespace System.IO.Compression
         Deflate = 8,
         Deflate64 = 9,
     }
+    public sealed partial class ZipStreamReader : System.IAsyncDisposable, System.IDisposable
+    {
+        public ZipStreamReader(System.IO.Stream stream, bool leaveOpen = false) { }
+        public ZipStreamReader(System.IO.Stream stream, System.Text.Encoding? entryNameEncoding, bool leaveOpen = false) { }
+        public System.IO.Compression.ZipStreamReaderEntry? GetNextEntry(bool copyData = false) { throw null; }
+        public System.Threading.Tasks.ValueTask<System.IO.Compression.ZipStreamReaderEntry?> GetNextEntryAsync(bool copyData = false, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) { throw null; }
+        public void Dispose() { }
+        public System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+    }
+    public sealed partial class ZipStreamReaderEntry
+    {
+        internal ZipStreamReaderEntry() { }
+        public string FullName { get { throw null; } }
+        public string Name { get { throw null; } }
+        public System.IO.Compression.ZipCompressionMethod CompressionMethod { get { throw null; } }
+        public System.DateTimeOffset LastModified { get { throw null; } }
+        [System.CLSCompliantAttribute(false)]
+        public uint Crc32 { get { throw null; } }
+        public long CompressedLength { get { throw null; } }
+        public long Length { get { throw null; } }
+        [System.CLSCompliantAttribute(false)]
+        public ushort GeneralPurposeBitFlags { get { throw null; } }
+        public bool IsEncrypted { get { throw null; } }
+        public bool IsDirectory { get { throw null; } }
+        [System.CLSCompliantAttribute(false)]
+        public ushort VersionNeeded { get { throw null; } }
+        public System.IO.Stream? DataStream { get { throw null; } }
+        public void ExtractToFile(string destinationFileName, bool overwrite) { }
+        public System.Threading.Tasks.Task ExtractToFileAsync(string destinationFileName, bool overwrite, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) { throw null; }
+    }
     public sealed partial class ZLibCompressionOptions
     {
         public ZLibCompressionOptions() { }
