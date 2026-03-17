@@ -219,9 +219,25 @@ public sealed class ZipStreamReaderEntry
 
     internal void InvalidateDataStream()
     {
-        _dataStreamInvalidated = true;
-    }
+        if (_dataStreamInvalidated)
+        {
+            return;
+        }
 
+        _dataStreamInvalidated = true;
+
+        _boundedStream?.Dispose();
+        _boundedStream = null;
+
+        // Don't dispose copied (MemoryStream) data streams here — they are owned
+        // by the caller and tracked by ZipStreamReader._dataStreamsToDispose for
+        // disposal when the reader itself is disposed.
+        if (!_dataCopied)
+        {
+            _dataStream?.Dispose();
+            _dataStream = null;
+        }
+    }
 
     internal void UpdateFromDataDescriptor(uint crc32, long compressedSize, long uncompressedSize)
     {

@@ -3,6 +3,7 @@
 
 using System.Buffers;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Threading;
@@ -35,6 +36,7 @@ public sealed class ZipStreamReader : IDisposable, IAsyncDisposable
     private bool _isDisposed;
     private bool _reachedEnd;
     private ZipStreamReaderEntry? _previousEntry;
+    private List<Stream>? _dataStreamsToDispose;
     private byte[]? _pushbackBuffer;
     private int _pushbackOffset;
     private int _pushbackCount;
@@ -169,6 +171,16 @@ public sealed class ZipStreamReader : IDisposable, IAsyncDisposable
             _isDisposed = true;
             _previousEntry?.InvalidateDataStream();
 
+            if (_dataStreamsToDispose is not null)
+            {
+                foreach (Stream stream in _dataStreamsToDispose)
+                {
+                    stream.Dispose();
+                }
+
+                _dataStreamsToDispose = null;
+            }
+
             if (!_leaveOpen)
             {
                 _archiveStream.Dispose();
@@ -183,6 +195,16 @@ public sealed class ZipStreamReader : IDisposable, IAsyncDisposable
         {
             _isDisposed = true;
             _previousEntry?.InvalidateDataStream();
+
+            if (_dataStreamsToDispose is not null)
+            {
+                foreach (Stream stream in _dataStreamsToDispose)
+                {
+                    await stream.DisposeAsync().ConfigureAwait(false);
+                }
+
+                _dataStreamsToDispose = null;
+            }
 
             if (!_leaveOpen)
             {
@@ -390,6 +412,11 @@ public sealed class ZipStreamReader : IDisposable, IAsyncDisposable
 
         _previousEntry = entry;
 
+        if (copyData && dataStream is not null)
+        {
+            (_dataStreamsToDispose ??= new List<Stream>()).Add(dataStream);
+        }
+
         return entry;
     }
 
@@ -492,6 +519,11 @@ public sealed class ZipStreamReader : IDisposable, IAsyncDisposable
             dataCopied: copyData);
 
         _previousEntry = entry;
+
+        if (copyData && dataStream is not null)
+        {
+            (_dataStreamsToDispose ??= new List<Stream>()).Add(dataStream);
+        }
 
         return entry;
     }
