@@ -1,15 +1,21 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace System.Formats.Tar.Tests
 {
-    public class TarWriter_WriteEntry_Roundtrip_Tests : TarTestsBase
+    // Shared roundtrip (write then read back) test bodies. Derived classes supply the sync or async
+    // implementations of WriteEntryAsync / GetNextEntryAsync so each test runs against both code paths.
+    public abstract class TarWriter_WriteEntry_Roundtrip_Tests_Base : TarTestsBase
     {
+        protected abstract Task WriteEntryAsync(TarWriter writer, TarEntry entry);
+        protected abstract Task<TarEntry> GetNextEntryAsync(TarReader reader);
+
         public static IEnumerable<object[]> NameRoundtripsTheoryData()
         {
             foreach (bool unseekableStream in new[] { false, true })
@@ -38,7 +44,7 @@ namespace System.Formats.Tar.Tests
 
         [Theory]
         [MemberData(nameof(NameRoundtripsTheoryData))]
-        public void NameRoundtrips(TarEntryFormat entryFormat, TarEntryType entryType, bool unseekableStream, string name)
+        public async Task NameRoundtrips(TarEntryFormat entryFormat, TarEntryType entryType, bool unseekableStream, string name)
         {
             TarEntry entry = InvokeTarEntryCreationConstructor(entryFormat, entryType, name);
             entry.Name = name;
@@ -46,16 +52,16 @@ namespace System.Formats.Tar.Tests
             MemoryStream ms = new();
             Stream s = unseekableStream ? new WrappedStream(ms, ms.CanRead, ms.CanWrite, canSeek: false) : ms;
 
-            using (TarWriter writer = new(s, leaveOpen: true))
+            await using (TarWriter writer = new(s, leaveOpen: true))
             {
-                writer.WriteEntry(entry);
+                await WriteEntryAsync(writer, entry);
             }
 
             ms.Position = 0;
-            using TarReader reader = new(s);
+            await using TarReader reader = new(s);
 
-            entry = reader.GetNextEntry();
-            Assert.Null(reader.GetNextEntry());
+            entry = await GetNextEntryAsync(reader);
+            Assert.Null(await GetNextEntryAsync(reader));
             Assert.Equal(name, entry.Name);
         }
 
@@ -82,7 +88,7 @@ namespace System.Formats.Tar.Tests
 
         [Theory]
         [MemberData(nameof(LinkNameRoundtripsTheoryData))]
-        public void LinkNameRoundtrips(TarEntryFormat entryFormat, TarEntryType entryType, bool unseekableStream, string linkName)
+        public async Task LinkNameRoundtrips(TarEntryFormat entryFormat, TarEntryType entryType, bool unseekableStream, string linkName)
         {
             string name = "foo";
             TarEntry entry = InvokeTarEntryCreationConstructor(entryFormat, entryType, name);
@@ -91,16 +97,16 @@ namespace System.Formats.Tar.Tests
             MemoryStream ms = new();
             Stream s = unseekableStream ? new WrappedStream(ms, ms.CanRead, ms.CanWrite, canSeek: false) : ms;
 
-            using (TarWriter writer = new(s, leaveOpen: true))
+            await using (TarWriter writer = new(s, leaveOpen: true))
             {
-                writer.WriteEntry(entry);
+                await WriteEntryAsync(writer, entry);
             }
 
             ms.Position = 0;
-            using TarReader reader = new(s);
+            await using TarReader reader = new(s);
 
-            entry = reader.GetNextEntry();
-            Assert.Null(reader.GetNextEntry());
+            entry = await GetNextEntryAsync(reader);
+            Assert.Null(await GetNextEntryAsync(reader));
             Assert.Equal(name, entry.Name);
             Assert.Equal(linkName, entry.LinkName);
         }
@@ -120,7 +126,7 @@ namespace System.Formats.Tar.Tests
 
         [Theory]
         [MemberData(nameof(UserNameGroupNameRoundtripsTheoryData))]
-        public void UserNameGroupNameRoundtrips(TarEntryFormat entryFormat, bool unseekableStream, string userGroupName)
+        public async Task UserNameGroupNameRoundtrips(TarEntryFormat entryFormat, bool unseekableStream, string userGroupName)
         {
             string name = "foo";
             TarEntry entry = InvokeTarEntryCreationConstructor(entryFormat, TarEntryType.RegularFile, name);
@@ -131,17 +137,17 @@ namespace System.Formats.Tar.Tests
             MemoryStream ms = new();
             Stream s = unseekableStream ? new WrappedStream(ms, ms.CanRead, ms.CanWrite, canSeek: false) : ms;
 
-            using (TarWriter writer = new(s, leaveOpen: true))
+            await using (TarWriter writer = new(s, leaveOpen: true))
             {
-                writer.WriteEntry(posixEntry);
+                await WriteEntryAsync(writer, posixEntry);
             }
 
             ms.Position = 0;
-            using TarReader reader = new(s);
+            await using TarReader reader = new(s);
 
-            entry = reader.GetNextEntry();
+            entry = await GetNextEntryAsync(reader);
             posixEntry = Assert.IsAssignableFrom<PosixTarEntry>(entry);
-            Assert.Null(reader.GetNextEntry());
+            Assert.Null(await GetNextEntryAsync(reader));
 
             Assert.Equal(name, posixEntry.Name);
             Assert.Equal(userGroupName, posixEntry.UserName);
@@ -153,7 +159,7 @@ namespace System.Formats.Tar.Tests
         [InlineData(TarEntryType.Directory)]
         [InlineData(TarEntryType.HardLink)]
         [InlineData(TarEntryType.SymbolicLink)]
-        public void PaxExtendedAttributes_DoNotOverwritePublicProperties_WhenTheyFitOnLegacyFields(TarEntryType entryType)
+        public async Task PaxExtendedAttributes_DoNotOverwritePublicProperties_WhenTheyFitOnLegacyFields(TarEntryType entryType)
         {
             Dictionary<string, string> extendedAttributes = new();
             extendedAttributes[PaxEaGName] = "ea_gname";
@@ -180,15 +186,15 @@ namespace System.Formats.Tar.Tests
             }
 
             MemoryStream ms = new();
-            using (TarWriter w = new(ms, leaveOpen: true))
+            await using (TarWriter w = new(ms, leaveOpen: true))
             {
-                w.WriteEntry(writeEntry);
+                await WriteEntryAsync(w, writeEntry);
             }
             ms.Position = 0;
 
-            using TarReader r = new(ms);
-            PaxTarEntry readEntry = Assert.IsType<PaxTarEntry>(r.GetNextEntry());
-            Assert.Null(r.GetNextEntry());
+            await using TarReader r = new(ms);
+            PaxTarEntry readEntry = Assert.IsType<PaxTarEntry>(await GetNextEntryAsync(r));
+            Assert.Null(await GetNextEntryAsync(r));
 
             Assert.Equal(writeEntry.Name, readEntry.Name);
             Assert.Equal(writeEntry.GroupName, readEntry.GroupName);
@@ -205,7 +211,7 @@ namespace System.Formats.Tar.Tests
         [InlineData(TarEntryType.Directory)]
         [InlineData(TarEntryType.HardLink)]
         [InlineData(TarEntryType.SymbolicLink)]
-        public void PaxExtendedAttributes_DoNotOverwritePublicProperties_WhenLargerThanLegacyFields(TarEntryType entryType)
+        public async Task PaxExtendedAttributes_DoNotOverwritePublicProperties_WhenLargerThanLegacyFields(TarEntryType entryType)
         {
             Dictionary<string, string> extendedAttributes = new();
             extendedAttributes[PaxEaGName] = "ea_gname";
@@ -231,15 +237,15 @@ namespace System.Formats.Tar.Tests
             }
 
             MemoryStream ms = new();
-            using (TarWriter w = new(ms, leaveOpen: true))
+            await using (TarWriter w = new(ms, leaveOpen: true))
             {
-                w.WriteEntry(writeEntry);
+                await WriteEntryAsync(w, writeEntry);
             }
             ms.Position = 0;
 
-            using TarReader r = new(ms);
-            PaxTarEntry readEntry = Assert.IsType<PaxTarEntry>(r.GetNextEntry());
-            Assert.Null(r.GetNextEntry());
+            await using TarReader r = new(ms);
+            PaxTarEntry readEntry = Assert.IsType<PaxTarEntry>(await GetNextEntryAsync(r));
+            Assert.Null(await GetNextEntryAsync(r));
 
             Assert.Equal(writeEntry.Name, readEntry.Name);
             Assert.Equal(writeEntry.GroupName, readEntry.GroupName);
@@ -247,5 +253,44 @@ namespace System.Formats.Tar.Tests
             Assert.Equal(writeEntry.ModificationTime, readEntry.ModificationTime);
             Assert.Equal(writeEntry.LinkName, readEntry.LinkName);
         }
+    }
+
+    // Runs the shared roundtrip bodies against the synchronous WriteEntry / GetNextEntry APIs.
+    public sealed class TarWriter_WriteEntry_Roundtrip_Tests : TarWriter_WriteEntry_Roundtrip_Tests_Base
+    {
+        protected override Task WriteEntryAsync(TarWriter writer, TarEntry entry)
+        {
+            try
+            {
+                writer.WriteEntry(entry);
+                return Task.CompletedTask;
+            }
+            catch (Exception e)
+            {
+                return Task.FromException(e);
+            }
+        }
+
+        protected override Task<TarEntry> GetNextEntryAsync(TarReader reader)
+        {
+            try
+            {
+                return Task.FromResult(reader.GetNextEntry());
+            }
+            catch (Exception e)
+            {
+                return Task.FromException<TarEntry>(e);
+            }
+        }
+    }
+
+    // Runs the shared roundtrip bodies against the asynchronous WriteEntryAsync / GetNextEntryAsync APIs.
+    public sealed class TarWriter_WriteEntryAsync_Roundtrip_Tests : TarWriter_WriteEntry_Roundtrip_Tests_Base
+    {
+        protected override Task WriteEntryAsync(TarWriter writer, TarEntry entry) =>
+            writer.WriteEntryAsync(entry);
+
+        protected override async Task<TarEntry> GetNextEntryAsync(TarReader reader) =>
+            await reader.GetNextEntryAsync();
     }
 }

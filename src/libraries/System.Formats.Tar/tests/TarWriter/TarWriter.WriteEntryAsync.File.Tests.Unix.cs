@@ -8,7 +8,7 @@ using Xunit;
 
 namespace System.Formats.Tar.Tests
 {
-    public partial class TarWriter_WriteEntryAsync_File_Tests : TarWriter_File_Base
+    public partial class TarWriter_WriteEntryAsync_File_Tests
     {
         [ConditionalTheory(typeof(TarWriter_WriteEntryAsync_File_Tests), nameof(IsRemoteExecutorSupportedAndPrivilegedProcess))]
         [InlineData(TarEntryFormat.Ustar)]

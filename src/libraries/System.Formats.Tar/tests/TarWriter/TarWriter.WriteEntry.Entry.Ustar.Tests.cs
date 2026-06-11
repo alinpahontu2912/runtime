@@ -1,28 +1,37 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.IO;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace System.Formats.Tar.Tests
 {
-    // Tests specific to Ustar format.
-    public class TarWriter_WriteEntry_Ustar_Tests : TarWriter_WriteEntry_Base
+    // Shared test bodies for writing Ustar entries. Derived classes supply the sync or async
+    // implementation of WriteEntryAsync so each test runs against both code paths.
+    public abstract class TarWriter_WriteEntry_Ustar_Tests_Base : TarWriter_WriteEntry_Base
     {
-        [Fact]
-        public void WriteEntry_Null_Throws() =>
-            WriteEntry_Null_Throws_Internal(TarEntryFormat.Ustar);
+        // Calls the synchronous WriteEntry or the asynchronous WriteEntryAsync depending on the derived class.
+        protected abstract Task WriteEntryAsync(TarWriter writer, TarEntry entry);
 
         [Fact]
-        public void WriteRegularFile()
+        public async Task WriteEntry_Null_Throws()
+        {
+            await using MemoryStream archiveStream = new MemoryStream();
+            await using TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: false);
+            await Assert.ThrowsAsync<ArgumentNullException>(() => WriteEntryAsync(writer, null));
+        }
+
+        [Fact]
+        public async Task WriteRegularFile()
         {
             using MemoryStream archiveStream = new MemoryStream();
-            using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
+            await using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
             {
                 UstarTarEntry regularFile = new UstarTarEntry(TarEntryType.RegularFile, InitialEntryName);
                 SetRegularFile(regularFile);
                 VerifyRegularFile(regularFile, isWritable: true);
-                writer.WriteEntry(regularFile);
+                await WriteEntryAsync(writer, regularFile);
             }
 
             archiveStream.Position = 0;
@@ -34,15 +43,15 @@ namespace System.Formats.Tar.Tests
         }
 
         [Fact]
-        public void WriteHardLink()
+        public async Task WriteHardLink()
         {
             using MemoryStream archiveStream = new MemoryStream();
-            using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
+            await using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
             {
                 UstarTarEntry hardLink = new UstarTarEntry(TarEntryType.HardLink, InitialEntryName);
                 SetHardLink(hardLink);
                 VerifyHardLink(hardLink);
-                writer.WriteEntry(hardLink);
+                await WriteEntryAsync(writer, hardLink);
             }
 
             archiveStream.Position = 0;
@@ -54,15 +63,15 @@ namespace System.Formats.Tar.Tests
         }
 
         [Fact]
-        public void WriteSymbolicLink()
+        public async Task WriteSymbolicLink()
         {
             using MemoryStream archiveStream = new MemoryStream();
-            using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
+            await using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
             {
                 UstarTarEntry symbolicLink = new UstarTarEntry(TarEntryType.SymbolicLink, InitialEntryName);
                 SetSymbolicLink(symbolicLink);
                 VerifySymbolicLink(symbolicLink);
-                writer.WriteEntry(symbolicLink);
+                await WriteEntryAsync(writer, symbolicLink);
             }
 
             archiveStream.Position = 0;
@@ -74,15 +83,15 @@ namespace System.Formats.Tar.Tests
         }
 
         [Fact]
-        public void WriteDirectory()
+        public async Task WriteDirectory()
         {
             using MemoryStream archiveStream = new MemoryStream();
-            using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
+            await using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
             {
                 UstarTarEntry directory = new UstarTarEntry(TarEntryType.Directory, InitialEntryName);
                 SetDirectory(directory);
                 VerifyDirectory(directory);
-                writer.WriteEntry(directory);
+                await WriteEntryAsync(writer, directory);
             }
 
             archiveStream.Position = 0;
@@ -94,15 +103,15 @@ namespace System.Formats.Tar.Tests
         }
 
         [Fact]
-        public void WriteCharacterDevice()
+        public async Task WriteCharacterDevice()
         {
             using MemoryStream archiveStream = new MemoryStream();
-            using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
+            await using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
             {
                 UstarTarEntry charDevice = new UstarTarEntry(TarEntryType.CharacterDevice, InitialEntryName);
                 SetCharacterDevice(charDevice);
                 VerifyCharacterDevice(charDevice);
-                writer.WriteEntry(charDevice);
+                await WriteEntryAsync(writer, charDevice);
             }
 
             archiveStream.Position = 0;
@@ -114,15 +123,15 @@ namespace System.Formats.Tar.Tests
         }
 
         [Fact]
-        public void WriteBlockDevice()
+        public async Task WriteBlockDevice()
         {
             using MemoryStream archiveStream = new MemoryStream();
-            using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
+            await using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
             {
                 UstarTarEntry blockDevice = new UstarTarEntry(TarEntryType.BlockDevice, InitialEntryName);
                 SetBlockDevice(blockDevice);
                 VerifyBlockDevice(blockDevice);
-                writer.WriteEntry(blockDevice);
+                await WriteEntryAsync(writer, blockDevice);
             }
 
             archiveStream.Position = 0;
@@ -134,15 +143,15 @@ namespace System.Formats.Tar.Tests
         }
 
         [Fact]
-        public void WriteFifo()
+        public async Task WriteFifo()
         {
             using MemoryStream archiveStream = new MemoryStream();
-            using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
+            await using (TarWriter writer = new TarWriter(archiveStream, TarEntryFormat.Ustar, leaveOpen: true))
             {
                 UstarTarEntry fifo = new UstarTarEntry(TarEntryType.Fifo, InitialEntryName);
                 SetFifo(fifo);
                 VerifyFifo(fifo);
-                writer.WriteEntry(fifo);
+                await WriteEntryAsync(writer, fifo);
             }
 
             archiveStream.Position = 0;
@@ -156,11 +165,35 @@ namespace System.Formats.Tar.Tests
         [Theory]
         [InlineData(TarEntryType.HardLink)]
         [InlineData(TarEntryType.SymbolicLink)]
-        public void Write_LinkEntry_EmptyLinkName_Throws(TarEntryType entryType)
+        public async Task Write_LinkEntry_EmptyLinkName_Throws(TarEntryType entryType)
         {
-            using MemoryStream archiveStream = new MemoryStream();
-            using TarWriter writer = new TarWriter(archiveStream, leaveOpen: false);
-            Assert.Throws<ArgumentException>("entry", () => writer.WriteEntry(new UstarTarEntry(entryType, "link")));
+            await using MemoryStream archiveStream = new MemoryStream();
+            await using TarWriter writer = new TarWriter(archiveStream, leaveOpen: false);
+            await Assert.ThrowsAsync<ArgumentException>("entry", () => WriteEntryAsync(writer, new UstarTarEntry(entryType, "link")));
         }
+    }
+
+    // Runs the shared Ustar write test bodies against the synchronous WriteEntry API.
+    public sealed class TarWriter_WriteEntry_Ustar_Tests : TarWriter_WriteEntry_Ustar_Tests_Base
+    {
+        protected override Task WriteEntryAsync(TarWriter writer, TarEntry entry)
+        {
+            try
+            {
+                writer.WriteEntry(entry);
+                return Task.CompletedTask;
+            }
+            catch (Exception e)
+            {
+                return Task.FromException(e);
+            }
+        }
+    }
+
+    // Runs the shared Ustar write test bodies against the asynchronous WriteEntryAsync API.
+    public sealed class TarWriter_WriteEntryAsync_Ustar_Tests : TarWriter_WriteEntry_Ustar_Tests_Base
+    {
+        protected override Task WriteEntryAsync(TarWriter writer, TarEntry entry) =>
+            writer.WriteEntryAsync(entry);
     }
 }

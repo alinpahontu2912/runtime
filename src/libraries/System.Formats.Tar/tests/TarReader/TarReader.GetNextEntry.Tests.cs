@@ -1,31 +1,39 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace System.Formats.Tar.Tests
 {
-    public class TarReader_GetNextEntry_Tests : TarTestsBase
+    // Shared test bodies for TarReader.GetNextEntry / GetNextEntryAsync.
+    // Derived classes provide the sync or async implementation of GetNextEntryAsync so each
+    // test runs against both code paths without duplicating the test logic.
+    public abstract class TarReader_GetNextEntry_Tests_Base : TarTestsBase
     {
-        private const int MaxMetadataBlockSize = 1024 * 1024;
+        protected const int MaxMetadataBlockSize = 1024 * 1024;
+
+        // Calls the synchronous GetNextEntry or the asynchronous GetNextEntryAsync depending on the derived class.
+        protected abstract Task<TarEntry?> GetNextEntryAsync(TarReader reader, bool copyData = false);
 
         [Fact]
-        public void MalformedArchive_TooSmall()
+        public async Task MalformedArchive_TooSmall()
         {
             using MemoryStream malformed = new MemoryStream();
             byte[] buffer = new byte[] { 0x1 };
             malformed.Write(buffer);
             malformed.Seek(0, SeekOrigin.Begin);
 
-            using TarReader reader = new TarReader(malformed);
-            Assert.Throws<EndOfStreamException>(() => reader.GetNextEntry());
+            await using TarReader reader = new TarReader(malformed);
+            await Assert.ThrowsAsync<EndOfStreamException>(() => GetNextEntryAsync(reader));
         }
 
         [Fact]
-        public void MalformedArchive_HeaderSize()
+        public async Task MalformedArchive_HeaderSize()
         {
             using MemoryStream malformed = new MemoryStream();
             byte[] buffer = new byte[512]; // Minimum length of any header
@@ -33,22 +41,21 @@ namespace System.Formats.Tar.Tests
             malformed.Write(buffer);
             malformed.Seek(0, SeekOrigin.Begin);
 
-            using TarReader reader = new TarReader(malformed);
-            Assert.Throws<InvalidDataException>(() => reader.GetNextEntry());
+            await using TarReader reader = new TarReader(malformed);
+            await Assert.ThrowsAsync<InvalidDataException>(() => GetNextEntryAsync(reader));
         }
 
         [Fact]
-        public void EmptyArchive()
+        public async Task EmptyArchive()
         {
             using MemoryStream empty = new MemoryStream();
 
-            using TarReader reader = new TarReader(empty);
-            Assert.Null(reader.GetNextEntry());
+            await using TarReader reader = new TarReader(empty);
+            Assert.Null(await GetNextEntryAsync(reader));
         }
 
-
         [Fact]
-        public void LongEndMarkers_DoNotAdvanceStream()
+        public async Task LongEndMarkers_DoNotAdvanceStream()
         {
             using MemoryStream archive = new MemoryStream();
 
@@ -63,16 +70,16 @@ namespace System.Formats.Tar.Tests
             archive.Write(buffer);
             archive.Seek(0, SeekOrigin.Begin);
 
-            using TarReader reader = new TarReader(archive);
-            Assert.NotNull(reader.GetNextEntry());
-            Assert.Null(reader.GetNextEntry());
+            await using TarReader reader = new TarReader(archive);
+            Assert.NotNull(await GetNextEntryAsync(reader));
+            Assert.Null(await GetNextEntryAsync(reader));
             long expectedPosition = archive.Position; // After reading the first null entry, should not advance more
-            Assert.Null(reader.GetNextEntry());
+            Assert.Null(await GetNextEntryAsync(reader));
             Assert.Equal(expectedPosition, archive.Position);
         }
 
         [Fact]
-        public void GetNextEntry_CopyDataTrue_SeekableArchive()
+        public async Task GetNextEntry_CopyDataTrue_SeekableArchive()
         {
             string expectedText = "Hello world!";
             MemoryStream archive = new MemoryStream();
@@ -94,15 +101,15 @@ namespace System.Formats.Tar.Tests
             archive.Seek(0, SeekOrigin.Begin);
 
             UstarTarEntry entry;
-            using (TarReader reader = new TarReader(archive)) // Seekable
+            await using (TarReader reader = new TarReader(archive)) // Seekable
             {
-                entry = reader.GetNextEntry(copyData: true) as UstarTarEntry;
+                entry = await GetNextEntryAsync(reader, copyData: true) as UstarTarEntry;
                 Assert.NotNull(entry);
                 Assert.Equal(TarEntryType.RegularFile, entry.EntryType);
 
                 // Force reading the next entry to advance the underlying stream position
-                Assert.NotNull(reader.GetNextEntry());
-                Assert.Null(reader.GetNextEntry());
+                Assert.NotNull(await GetNextEntryAsync(reader));
+                Assert.Null(await GetNextEntryAsync(reader));
 
                 entry.DataStream.Seek(0, SeekOrigin.Begin); // Should not throw: This is a new stream, not the archive's disposed stream
                 using (StreamReader streamReader = new StreamReader(entry.DataStream))
@@ -118,7 +125,7 @@ namespace System.Formats.Tar.Tests
         }
 
         [Fact]
-        public void GetNextEntry_CopyDataTrue_UnseekableArchive()
+        public async Task GetNextEntry_CopyDataTrue_UnseekableArchive()
         {
             string expectedText = "Hello world!";
             MemoryStream archive = new MemoryStream();
@@ -141,15 +148,15 @@ namespace System.Formats.Tar.Tests
             using WrappedStream wrapped = new WrappedStream(archive, canRead: true, canWrite: false, canSeek: false);
 
             UstarTarEntry entry;
-            using (TarReader reader = new TarReader(wrapped, leaveOpen: true)) // Unseekable
+            await using (TarReader reader = new TarReader(wrapped, leaveOpen: true)) // Unseekable
             {
-                entry = reader.GetNextEntry(copyData: true) as UstarTarEntry;
+                entry = await GetNextEntryAsync(reader, copyData: true) as UstarTarEntry;
                 Assert.NotNull(entry);
                 Assert.Equal(TarEntryType.RegularFile, entry.EntryType);
 
                 // Force reading the next entry to advance the underlying stream position
-                Assert.NotNull(reader.GetNextEntry());
-                Assert.Null(reader.GetNextEntry());
+                Assert.NotNull(await GetNextEntryAsync(reader));
+                Assert.Null(await GetNextEntryAsync(reader));
 
                 Assert.NotNull(entry.DataStream);
                 entry.DataStream.Seek(0, SeekOrigin.Begin); // Should not throw: This is a new stream, not the archive's disposed stream
@@ -170,7 +177,7 @@ namespace System.Formats.Tar.Tests
         [InlineData(TarEntryFormat.Ustar)]
         [InlineData(TarEntryFormat.Pax)]
         [InlineData(TarEntryFormat.Gnu)]
-        public void GetNextEntry_CopyDataFalse_UnseekableArchive_Exceptions(TarEntryFormat format)
+        public async Task GetNextEntry_CopyDataFalse_UnseekableArchive_Exceptions(TarEntryFormat format)
         {
             TarEntryType fileEntryType = GetTarEntryTypeForTarEntryFormat(TarEntryType.RegularFile, format);
             using MemoryStream archive = new MemoryStream();
@@ -193,19 +200,19 @@ namespace System.Formats.Tar.Tests
             using WrappedStream wrapped = new WrappedStream(archive, canRead: true, canWrite: false, canSeek: false);
             TarEntry entry;
             byte[] b = new byte[1];
-            using (TarReader reader = new TarReader(wrapped)) // Unseekable
+            await using (TarReader reader = new TarReader(wrapped)) // Unseekable
             {
-                entry = reader.GetNextEntry(copyData: false);
+                entry = await GetNextEntryAsync(reader, copyData: false);
                 Assert.NotNull(entry);
                 Assert.Equal(fileEntryType, entry.EntryType);
                 entry.DataStream.ReadByte(); // Reading is possible as long as we don't move to the next entry
 
                 // Attempting to read the next entry should automatically move the position pointer to the beginning of the next header
-                TarEntry entry2 = reader.GetNextEntry();
+                TarEntry entry2 = await GetNextEntryAsync(reader);
                 Assert.NotNull(entry2);
                 Assert.Equal(format, entry2.Format);
                 Assert.Equal(TarEntryType.Directory, entry2.EntryType);
-                Assert.Null(reader.GetNextEntry());
+                Assert.Null(await GetNextEntryAsync(reader));
 
                 // This is not possible because the position of the main stream is already past the data
                 Assert.Throws<EndOfStreamException>(() => entry.DataStream.Read(b));
@@ -218,7 +225,7 @@ namespace System.Formats.Tar.Tests
         [Theory]
         [InlineData(false)]
         [InlineData(true)]
-        public void GetNextEntry_UnseekableArchive_ReplaceDataStream_ExcludeFromDisposing(bool copyData)
+        public async Task GetNextEntry_UnseekableArchive_ReplaceDataStream_ExcludeFromDisposing(bool copyData)
         {
             MemoryStream archive = new MemoryStream();
             using (TarWriter writer = new TarWriter(archive, TarEntryFormat.Ustar, leaveOpen: true))
@@ -240,9 +247,9 @@ namespace System.Formats.Tar.Tests
             using WrappedStream wrapped = new WrappedStream(archive, canRead: true, canWrite: false, canSeek: false);
             UstarTarEntry entry;
             Stream oldStream;
-            using (TarReader reader = new TarReader(wrapped)) // Unseekable
+            await using (TarReader reader = new TarReader(wrapped)) // Unseekable
             {
-                entry = reader.GetNextEntry(copyData) as UstarTarEntry;
+                entry = await GetNextEntryAsync(reader, copyData) as UstarTarEntry;
                 Assert.NotNull(entry);
                 Assert.Equal(TarEntryType.RegularFile, entry.EntryType);
 
@@ -271,7 +278,7 @@ namespace System.Formats.Tar.Tests
         [InlineData(512 + 1, true)]
         [InlineData(512 + 512 - 1, false)]
         [InlineData(512 + 512 - 1, true)]
-        public void BlockAlignmentPadding_DoesNotAffectNextEntries(int contentSize, bool copyData)
+        public async Task BlockAlignmentPadding_DoesNotAffectNextEntries(int contentSize, bool copyData)
         {
             byte[] fileContents = new byte[contentSize];
             Array.Fill<byte>(fileContents, 0x1);
@@ -289,24 +296,24 @@ namespace System.Formats.Tar.Tests
 
             archive.Position = 0;
             using var unseekable = new WrappedStream(archive, archive.CanRead, archive.CanWrite, canSeek: false);
-            using var reader = new TarReader(unseekable);
+            await using var reader = new TarReader(unseekable);
 
-            TarEntry e = reader.GetNextEntry(copyData);
+            TarEntry e = await GetNextEntryAsync(reader, copyData);
             Assert.Equal(contentSize, e.Length);
 
             byte[] buffer = new byte[contentSize];
             while (e.DataStream.Read(buffer) > 0) ;
             AssertExtensions.SequenceEqual(fileContents, buffer);
 
-            e = reader.GetNextEntry(copyData);
+            e = await GetNextEntryAsync(reader, copyData);
             Assert.Equal(0, e.Length);
 
-            e = reader.GetNextEntry(copyData);
+            e = await GetNextEntryAsync(reader, copyData);
             Assert.Null(e);
         }
 
         [Fact]
-        public void GetNextEntry_UnseekableArchive_DisposedDataStream_DoesNotThrow()
+        public async Task GetNextEntry_UnseekableArchive_DisposedDataStream_DoesNotThrow()
         {
             using var archive = new MemoryStream();
             using (var writer = new TarWriter(archive, leaveOpen: true))
@@ -322,9 +329,9 @@ namespace System.Formats.Tar.Tests
 
             archive.Position = 0;
             using var unseekable = new WrappedStream(archive, archive.CanRead, archive.CanWrite, canSeek: false);
-            using var reader = new TarReader(unseekable);
+            await using var reader = new TarReader(unseekable);
 
-            TarEntry entry = reader.GetNextEntry(copyData: false);
+            TarEntry entry = await GetNextEntryAsync(reader, copyData: false);
             Assert.NotNull(entry);
             Assert.Equal("file1.txt", entry.Name);
 
@@ -337,15 +344,15 @@ namespace System.Formats.Tar.Tests
 
             dataStream.Dispose();
 
-            TarEntry nextEntry = reader.GetNextEntry(copyData: false);
+            TarEntry nextEntry = await GetNextEntryAsync(reader, copyData: false);
             Assert.NotNull(nextEntry);
             Assert.Equal("file2.txt", nextEntry.Name);
 
-            Assert.Null(reader.GetNextEntry());
+            Assert.Null(await GetNextEntryAsync(reader));
         }
 
         [Fact]
-        public void GetNextEntry_UnseekableArchive_DisposedDataStream_PartiallyRead_DoesNotThrow()
+        public async Task GetNextEntry_UnseekableArchive_DisposedDataStream_PartiallyRead_DoesNotThrow()
         {
             using var archive = new MemoryStream();
             using (var writer = new TarWriter(archive, leaveOpen: true))
@@ -361,9 +368,9 @@ namespace System.Formats.Tar.Tests
 
             archive.Position = 0;
             using var unseekable = new WrappedStream(archive, archive.CanRead, archive.CanWrite, canSeek: false);
-            using var reader = new TarReader(unseekable);
+            await using var reader = new TarReader(unseekable);
 
-            TarEntry entry = reader.GetNextEntry(copyData: false);
+            TarEntry entry = await GetNextEntryAsync(reader, copyData: false);
             Assert.NotNull(entry);
             Assert.Equal("file1.txt", entry.Name);
 
@@ -376,15 +383,15 @@ namespace System.Formats.Tar.Tests
 
             dataStream.Dispose();
 
-            TarEntry nextEntry = reader.GetNextEntry(copyData: false);
+            TarEntry nextEntry = await GetNextEntryAsync(reader, copyData: false);
             Assert.NotNull(nextEntry);
             Assert.Equal("file2.txt", nextEntry.Name);
 
-            Assert.Null(reader.GetNextEntry());
+            Assert.Null(await GetNextEntryAsync(reader));
         }
 
         [Fact]
-        public void GetNextEntry_UnseekableArchive_DisposedDataStream_NotRead_DoesNotThrow()
+        public async Task GetNextEntry_UnseekableArchive_DisposedDataStream_NotRead_DoesNotThrow()
         {
             using var archive = new MemoryStream();
             using (var writer = new TarWriter(archive, leaveOpen: true))
@@ -400,9 +407,9 @@ namespace System.Formats.Tar.Tests
 
             archive.Position = 0;
             using var unseekable = new WrappedStream(archive, archive.CanRead, archive.CanWrite, canSeek: false);
-            using var reader = new TarReader(unseekable);
+            await using var reader = new TarReader(unseekable);
 
-            TarEntry entry = reader.GetNextEntry(copyData: false);
+            TarEntry entry = await GetNextEntryAsync(reader, copyData: false);
             Assert.NotNull(entry);
             Assert.Equal("file1.txt", entry.Name);
 
@@ -411,11 +418,11 @@ namespace System.Formats.Tar.Tests
 
             dataStream.Dispose();
 
-            TarEntry nextEntry = reader.GetNextEntry(copyData: false);
+            TarEntry nextEntry = await GetNextEntryAsync(reader, copyData: false);
             Assert.NotNull(nextEntry);
             Assert.Equal("file2.txt", nextEntry.Name);
 
-            Assert.Null(reader.GetNextEntry());
+            Assert.Null(await GetNextEntryAsync(reader));
         }
 
         public static IEnumerable<object[]> EAPathOverrideData()
@@ -428,27 +435,27 @@ namespace System.Formats.Tar.Tests
 
         [Theory]
         [MemberData(nameof(EAPathOverrideData))]
-        public void PaxReader_EAPathOverridesHeaderName(string headerName, string eaPath, string expectedName)
+        public async Task PaxReader_EAPathOverridesHeaderName(string headerName, string eaPath, string expectedName)
         {
             byte[] content = "test data"u8.ToArray();
             byte[] archive = BuildRawPaxArchiveWithEAPathOverride(headerName, eaPath, content);
 
             using var stream = new MemoryStream(archive);
-            using var reader = new TarReader(stream);
-            TarEntry entry = reader.GetNextEntry();
+            await using var reader = new TarReader(stream);
+            TarEntry entry = await GetNextEntryAsync(reader);
 
             Assert.NotNull(entry);
             Assert.Equal(expectedName, entry.Name);
         }
 
         [Fact]
-        public void PaxReader_EALinkpathOverridesHeaderLinkname()
+        public async Task PaxReader_EALinkpathOverridesHeaderLinkname()
         {
             byte[] archive = BuildRawPaxArchiveSymlink("mylink", "mylink", "./safe.txt", "./other.txt");
 
             using var stream = new MemoryStream(archive);
-            using var reader = new TarReader(stream);
-            TarEntry entry = reader.GetNextEntry();
+            await using var reader = new TarReader(stream);
+            TarEntry entry = await GetNextEntryAsync(reader);
 
             Assert.NotNull(entry);
             Assert.Equal("./other.txt", entry.LinkName);
@@ -463,7 +470,7 @@ namespace System.Formats.Tar.Tests
 
         [Theory]
         [MemberData(nameof(EASizeOverrideData))]
-        public void PaxReader_EASizeOverridesHeaderSize(int actualDataSize, long headerSize, long eaSize)
+        public async Task PaxReader_EASizeOverridesHeaderSize(int actualDataSize, long headerSize, long eaSize)
         {
             byte[] actualData = new byte[actualDataSize];
             Array.Fill<byte>(actualData, (byte)'X');
@@ -471,15 +478,15 @@ namespace System.Formats.Tar.Tests
             byte[] archive = BuildRawPaxArchiveWithSizeOverride("file.bin", "file.bin", actualData, headerSize, eaSize);
 
             using var stream = new MemoryStream(archive);
-            using var reader = new TarReader(stream);
-            TarEntry entry = reader.GetNextEntry(copyData: true);
+            await using var reader = new TarReader(stream);
+            TarEntry entry = await GetNextEntryAsync(reader, copyData: true);
 
             Assert.NotNull(entry);
             Assert.Equal(eaSize, entry.Length);
         }
 
         [Fact]
-        public void PaxReader_EntryLengthAndDataStreamLengthAreConsistent()
+        public async Task PaxReader_EntryLengthAndDataStreamLengthAreConsistent()
         {
             byte[] actualData = "ABCDEFGHIJ"u8.ToArray();
             long headerSize = 10;
@@ -488,8 +495,8 @@ namespace System.Formats.Tar.Tests
             byte[] archive = BuildRawPaxArchiveWithSizeOverride("file.bin", "file.bin", actualData, headerSize, eaSize);
 
             using var stream = new MemoryStream(archive);
-            using var reader = new TarReader(stream);
-            TarEntry entry = reader.GetNextEntry(copyData: true);
+            await using var reader = new TarReader(stream);
+            TarEntry entry = await GetNextEntryAsync(reader, copyData: true);
 
             Assert.NotNull(entry);
             Assert.NotNull(entry.DataStream);
@@ -497,7 +504,7 @@ namespace System.Formats.Tar.Tests
         }
 
         [Fact]
-        public void Read_Archive_With_Unsupported_EntryType()
+        public async Task Read_Archive_With_Unsupported_EntryType()
         {
             using MemoryStream archiveStream = new MemoryStream();
 
@@ -544,12 +551,12 @@ namespace System.Formats.Tar.Tests
 
             archiveStream.Seek(0, SeekOrigin.Begin);
 
-            using TarReader reader = new TarReader(archiveStream);
-            Assert.Throws<NotSupportedException>(() => reader.GetNextEntry());
+            await using TarReader reader = new TarReader(archiveStream);
+            await Assert.ThrowsAsync<NotSupportedException>(() => GetNextEntryAsync(reader));
         }
 
         [Fact]
-        public void Read_PaxEntryWithOnlyLinkpath_PreservesUstarPrefix()
+        public async Task Read_PaxEntryWithOnlyLinkpath_PreservesUstarPrefix()
         {
             // macOS bsdtar writes symlinks whose link target exceeds 100 bytes as a
             // PAX extended attributes entry (typeflag 'x') containing only "linkpath",
@@ -618,41 +625,41 @@ namespace System.Formats.Tar.Tests
             archiveStream.Write(new byte[1024]);
             archiveStream.Seek(0, SeekOrigin.Begin);
 
-            using TarReader reader2 = new TarReader(archiveStream);
-            TarEntry entry = reader2.GetNextEntry();
+            await using TarReader reader2 = new TarReader(archiveStream);
+            TarEntry entry = await GetNextEntryAsync(reader2);
             Assert.NotNull(entry);
             Assert.Equal(expectedName, entry.Name);
             Assert.Equal(longLinkTarget, entry.LinkName);
             Assert.Equal(TarEntryType.SymbolicLink, entry.EntryType);
-            Assert.Null(reader2.GetNextEntry());
+            Assert.Null(await GetNextEntryAsync(reader2));
         }
 
         [Theory]
         [InlineData("PaxExtendedAttributes", MaxMetadataBlockSize - 100)]
         [InlineData("GnuLongPath", MaxMetadataBlockSize)]
         [InlineData("GnuLongLink", MaxMetadataBlockSize)]
-        public void MetadataBlock_UnderMaxSize_Succeeds(string metadataType, int size)
+        public async Task MetadataBlock_UnderMaxSize_Succeeds(string metadataType, int size)
         {
             using MemoryStream archive = new MemoryStream();
             WriteMetadataEntry(archive, metadataType, size);
 
             archive.Seek(0, SeekOrigin.Begin);
-            using TarReader reader = new TarReader(archive);
-            Assert.NotNull(reader.GetNextEntry());
+            await using TarReader reader = new TarReader(archive);
+            Assert.NotNull(await GetNextEntryAsync(reader));
         }
 
         [Theory]
         [InlineData("PaxExtendedAttributes", MaxMetadataBlockSize)]
         [InlineData("GnuLongPath", MaxMetadataBlockSize + 1)]
         [InlineData("GnuLongLink", MaxMetadataBlockSize + 1)]
-        public void MetadataBlock_ExceedsMaxSize_Throws(string metadataType, int size)
+        public async Task MetadataBlock_ExceedsMaxSize_Throws(string metadataType, int size)
         {
             using MemoryStream archive = new MemoryStream();
             WriteMetadataEntry(archive, metadataType, size);
 
             archive.Seek(0, SeekOrigin.Begin);
-            using TarReader reader = new TarReader(archive);
-            Assert.Throws<InvalidOperationException>(() => reader.GetNextEntry());
+            await using TarReader reader = new TarReader(archive);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => GetNextEntryAsync(reader));
         }
 
         // Writes a TAR entry with metadata of the specified size.
@@ -689,6 +696,41 @@ namespace System.Formats.Tar.Tests
                         gnuLinkWriter.WriteEntry(entry);
                     }
                     break;
+            }
+        }
+    }
+
+    // Runs the shared TarReader.GetNextEntry test bodies against the synchronous GetNextEntry API.
+    public sealed class TarReader_GetNextEntry_Tests : TarReader_GetNextEntry_Tests_Base
+    {
+        protected override Task<TarEntry?> GetNextEntryAsync(TarReader reader, bool copyData = false)
+        {
+            try
+            {
+                return Task.FromResult(reader.GetNextEntry(copyData));
+            }
+            catch (Exception e)
+            {
+                return Task.FromException<TarEntry?>(e);
+            }
+        }
+    }
+
+    // Runs the shared bodies against GetNextEntryAsync, plus async-only tests that have no synchronous counterpart.
+    public sealed class TarReader_GetNextEntryAsync_Tests : TarReader_GetNextEntry_Tests_Base
+    {
+        protected override Task<TarEntry?> GetNextEntryAsync(TarReader reader, bool copyData = false) =>
+            reader.GetNextEntryAsync(copyData).AsTask();
+
+        [Fact]
+        public async Task GetNextEntryAsync_Cancel()
+        {
+            CancellationTokenSource cs = new CancellationTokenSource();
+            cs.Cancel();
+            await using (MemoryStream archiveStream = new MemoryStream())
+            await using (TarReader reader = new TarReader(archiveStream, leaveOpen: false))
+            {
+                await Assert.ThrowsAsync<TaskCanceledException>(async () => await reader.GetNextEntryAsync(copyData: false, cs.Token));
             }
         }
     }
