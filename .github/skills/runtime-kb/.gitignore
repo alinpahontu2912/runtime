@@ -1,0 +1,7 @@
+# Generated knowledge-base databases — one per area, rebuildable via sync_kb.py
+kbs/*.db
+kbs/*.db-journal
+kbs/*.db-wal
+kbs/*.db-shm
+
+scripts/__pycache__/
